@@ -5,11 +5,11 @@ from minecraft.networking.packets import (
 from minecraft.networking.types import (
     Double, Float, Boolean, VarInt, String, Byte, Position, Enum,
     RelativeHand, BlockFace, Vector, Direction, PositionAndLook,
-    multi_attribute_alias,
+    multi_attribute_alias, Short
 )
 
 from .client_settings_packet import ClientSettingsPacket
-
+from .held_item_change_packet import HeldItemChangePacket
 
 # Formerly known as state_playing_serverbound.
 def get_packets(context):
@@ -22,6 +22,9 @@ def get_packets(context):
         ClientSettingsPacket,
         PluginMessagePacket,
         PlayerBlockPlacementPacket,
+        PlayerAbilitiesPacket,
+        ResourcePackStatusPacket,
+        HeldItemChangePacket,
     }
     if context.protocol_later_eq(69):
         packets |= {
@@ -31,13 +34,18 @@ def get_packets(context):
         packets |= {
             TeleportConfirmPacket,
         }
+    if context.protocol_version >= 94:
+        packets |= {
+            VehicleMovePacket,
+        }
     return packets
 
 
 class KeepAlivePacket(AbstractKeepAlivePacket):
     @staticmethod
     def get_id(context):
-        return 0x10 if context.protocol_later_eq(712) else \
+        return 0x0F if context.protocol_later_eq(755) else \
+               0x10 if context.protocol_later_eq(712) else \
                0x0F if context.protocol_later_eq(471) else \
                0x10 if context.protocol_later_eq(464) else \
                0x0E if context.protocol_later_eq(389) else \
@@ -50,10 +58,44 @@ class KeepAlivePacket(AbstractKeepAlivePacket):
                0x00
 
 
+class VehicleMovePacket(Packet):
+    @staticmethod
+    def get_id(context):
+        return 0x15 if context.protocol_version >= 464 else \
+               0x13 if context.protocol_version >= 389 else \
+               0x11 if context.protocol_version >= 386 else \
+               0x10 if context.protocol_version >= 345 else \
+               0x0F if context.protocol_version >= 343 else \
+               0x10 if context.protocol_version >= 336 else \
+               0x11 if context.protocol_version >= 318 else \
+               0x10  # Note: Packet added in protocol version 94
+
+    packet_name = "vehicle move serverbound"
+    definition = [
+        {'x': Double},
+        {'y': Double},
+        {'z': Double},
+        {'yaw': Float},
+        {'pitch': Float},
+    ]
+
+    # Access the 'x', 'y', 'z' fields as a Vector tuple.
+    position = multi_attribute_alias(Vector, 'x', 'y', 'z')
+
+    # Access the 'yaw', 'pitch' fields as a Direction tuple.
+    look = multi_attribute_alias(Direction, 'yaw', 'pitch')
+
+    # Access the 'x', 'y', 'z', 'yaw', 'pitch' fields as a PositionAndLook.
+    # NOTE: modifying the object retrieved from this property will not change
+    # the packet; it can only be changed by attribute or property assignment.
+    position_and_look = multi_attribute_alias(
+        PositionAndLook, 'x', 'y', 'z', 'yaw', 'pitch')
+
 class ChatPacket(Packet):
     @staticmethod
     def get_id(context):
-        return 0x03 if context.protocol_later_eq(464) else \
+        return 0x03 if context.protocol_later_eq(755) else \
+               0x03 if context.protocol_later_eq(464) else \
                0x02 if context.protocol_later_eq(389) else \
                0x01 if context.protocol_later_eq(343) else \
                0x02 if context.protocol_later_eq(336) else \
@@ -79,7 +121,8 @@ class ChatPacket(Packet):
 class PositionAndLookPacket(Packet):
     @staticmethod
     def get_id(context):
-        return 0x13 if context.protocol_later_eq(712) else \
+        return 0x12 if context.protocol_later_eq(755) else \
+               0x13 if context.protocol_later_eq(712) else \
                0x12 if context.protocol_later_eq(471) else \
                0x13 if context.protocol_later_eq(464) else \
                0x11 if context.protocol_later_eq(389) else \
@@ -126,7 +169,8 @@ class TeleportConfirmPacket(Packet):
 class AnimationPacket(Packet):
     @staticmethod
     def get_id(context):
-        return 0x2C if context.protocol_later_eq(738) else \
+        return 0x2C if context.protocol_later_eq(755) else \
+               0x2C if context.protocol_later_eq(738) else \
                0x2B if context.protocol_later_eq(712) else \
                0x2A if context.protocol_later_eq(468) else \
                0x29 if context.protocol_later_eq(464) else \
@@ -150,15 +194,15 @@ class AnimationPacket(Packet):
 class ClientStatusPacket(Packet, Enum):
     @staticmethod
     def get_id(context):
-        return 0x04 if context.protocol_later_eq(464) else \
+        return 0x04 if context.protocol_later_eq(755) else \
+               0x04 if context.protocol_later_eq(464) else \
                0x03 if context.protocol_later_eq(389) else \
                0x02 if context.protocol_later_eq(343) else \
                0x03 if context.protocol_later_eq(336) else \
                0x04 if context.protocol_later_eq(318) else \
                0x03 if context.protocol_later_eq(80) else \
                0x02 if context.protocol_later_eq(67) else \
-               0x17 if context.protocol_later_eq(49) else \
-               0x16
+               0x17
 
     packet_name = "client status"
     get_definition = staticmethod(lambda context: [
@@ -175,7 +219,8 @@ class ClientStatusPacket(Packet, Enum):
 class PluginMessagePacket(AbstractPluginMessagePacket):
     @staticmethod
     def get_id(context):
-        return 0x0B if context.protocol_later_eq(464) else \
+        return 0x0A if context.protocol_later_eq(755) else \
+               0x0B if context.protocol_later_eq(464) else \
                0x0A if context.protocol_later_eq(389) else \
                0x09 if context.protocol_later_eq(345) else \
                0x08 if context.protocol_later_eq(343) else \
@@ -201,7 +246,8 @@ class PlayerBlockPlacementPacket(Packet):
 
     @staticmethod
     def get_id(context):
-        return 0x2E if context.protocol_later_eq(738) else \
+        return 0x2E if context.protocol_later_eq(755) else \
+               0x2E if context.protocol_later_eq(738) else \
                0x2D if context.protocol_later_eq(712) else \
                0x2C if context.protocol_later_eq(468) else \
                0x2B if context.protocol_later_eq(464) else \
@@ -240,7 +286,8 @@ class PlayerBlockPlacementPacket(Packet):
 class UseItemPacket(Packet):
     @staticmethod
     def get_id(context):
-        return 0x2F if context.protocol_later_eq(738) else \
+        return 0x2F if context.protocol_later_eq(755) else \
+               0x2F if context.protocol_later_eq(738) else \
                0x2E if context.protocol_later_eq(712) else \
                0x2D if context.protocol_later_eq(468) else \
                0x2C if context.protocol_later_eq(464) else \
@@ -251,7 +298,7 @@ class UseItemPacket(Packet):
                0x20 if context.protocol_later_eq(332) else \
                0x1F if context.protocol_later_eq(318) else \
                0x1D if context.protocol_later_eq(94) else \
-               0x1A if context.protocol_later_eq(70) else \
+               0x1A if context.protocol_later_eq(67) else \
                0x08
 
     packet_name = "use item"
@@ -259,3 +306,42 @@ class UseItemPacket(Packet):
         {'hand': VarInt}])
 
     Hand = RelativeHand
+
+class ResourcePackStatusPacket(Packet):
+    @staticmethod
+    def get_id(context):
+        return 0x21 if context.protocol_later_eq(755) else \
+               0x21 if context.protocol_later_eq(741) else \
+               0x20 if context.protocol_later_eq(721) else \
+               0x1F if context.protocol_later_eq(464) else \
+               0x1D if context.protocol_later_eq(389) else \
+               0x1B if context.protocol_later_eq(386) else \
+               0x17 if context.protocol_later_eq(343) else \
+               0x18 if context.protocol_later_eq(332) else \
+               0x18 if context.protocol_later_eq(318) else \
+               0x16 if context.protocol_later_eq(204) else \
+               0x16 if context.protocol_later_eq(80) else \
+               0x14 if context.protocol_later_eq(77) else \
+               0x13 if context.protocol_later_eq(70) else \
+               0x1A if context.protocol_later_eq(67) else \
+               0x19
+
+    packet_name = "resource pask status"
+    definition = [
+        {"result": VarInt}
+    ]
+
+class PlayerAbilitiesPacket(Packet):
+    @staticmethod
+    def get_id(context):
+        return 0x19 if context.protocol_later_eq(464) else \
+               0x17 if context.protocol_later_eq(389) else \
+               0x15 if context.protocol_later_eq(386) else \
+               0x12 if context.protocol_later_eq(343) else \
+               0x13 if context.protocol_later_eq(318) else \
+               0x12
+
+    packet_name = 'player abilities'
+    definition = [
+        {'flags': Byte}
+    ]

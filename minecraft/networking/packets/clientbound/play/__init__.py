@@ -5,7 +5,7 @@ from minecraft.networking.packets import (
 from minecraft.networking.types import (
     FixedPoint, Integer, Angle, UnsignedByte, Byte, Boolean, UUID, Short,
     VarInt, Double, Float, String, Enum, Difficulty, Long, Vector, Direction,
-    PositionAndLook, multi_attribute_alias, attribute_transform,
+    PositionAndLook, multi_attribute_alias, attribute_transform
 )
 
 from .combat_event_packet import CombatEventPacket
@@ -18,7 +18,9 @@ from .explosion_packet import ExplosionPacket
 from .sound_effect_packet import SoundEffectPacket
 from .face_player_packet import FacePlayerPacket
 from .join_game_and_respawn_packets import JoinGamePacket, RespawnPacket
-
+from .vehicle_move_packet import VehicleMovePacket
+from .tab_complete_packet import TabCompletePacket
+from .player_abilities import PlayerAbilitiesPacket
 
 # Formerly known as state_playing_clientbound.
 def get_packets(context):
@@ -27,10 +29,13 @@ def get_packets(context):
         JoinGamePacket,
         ServerDifficultyPacket,
         ChatMessagePacket,
+        HeldItemChangePacket,
+        PlayerAbilitiesPacket,
         PlayerPositionAndLookPacket,
         MapPacket,
         PlayerListItemPacket,
         DisconnectPacket,
+        VehicleMovePacket,
         SpawnPlayerPacket,
         EntityVelocityPacket,
         EntityPositionDeltaPacket,
@@ -41,11 +46,16 @@ def get_packets(context):
         SpawnObjectPacket,
         BlockChangePacket,
         MultiBlockChangePacket,
+        SetSlotPacket,
         RespawnPacket,
+        SetExperiencePacket,
         PluginMessagePacket,
         PlayerListHeaderAndFooterPacket,
-        EntityLookPacket
-    }
+        ResourcePackSendPacket,
+        EntityLookPacket,
+        BlockActionPacket,
+        EntityHeadLookPacket
+        }
     if context.protocol_earlier_eq(47):
         packets |= {
             SetCompressionPacket,
@@ -58,13 +68,134 @@ def get_packets(context):
         packets |= {
             FacePlayerPacket
         }
+    if context.protocol_later_eq(345) or \
+            context.protocol_earlier_eq(342):
+        packets |= {
+            TabCompletePacket,
+        }
     return packets
 
+class BlockActionPacket(Packet):
+    @staticmethod
+    def get_id(context):
+        return 0x0B if context.protocol_version >= 550 else \
+               0x0A if context.protocol_version >= 332 else \
+               0x0B if context.protocol_version >= 318 else \
+               0x0A if context.protocol_version >= 67 else \
+               0x25 if context.protocol_version >= 62 else \
+               0x24
+
+    packet_name = "block action"
+    get_definition = staticmethod(lambda context: [
+        {'location': Position},
+        {'block_type': VarInt} if context.protocol_version == 347 else {},
+        {'action_id': UnsignedByte},     # TODO Interpret action_id and
+        {'action_param': UnsignedByte},  # action_param fields.
+        {'block_type': VarInt} if context.protocol_version != 347 else {},
+    ])
+
+class HeldItemChangePacket(Packet):
+    @staticmethod
+    def get_id(context):
+        return 0x48 if context.protocol_version >= 755 else \
+               0x40 if context.protocol_version >= 550 else \
+               0x3F if context.protocol_version >= 471 else \
+               0x3D if context.protocol_version >= 461 else \
+               0x3E if context.protocol_version >= 451 else \
+               0x3D if context.protocol_version >= 389 else \
+               0x3C if context.protocol_version >= 352 else \
+               0x3B if context.protocol_version >= 345 else \
+               0x3A if context.protocol_version >= 336 else \
+               0x39 if context.protocol_version >= 318 else \
+               0x37 if context.protocol_version >= 86 else \
+               0x38 if context.protocol_version >= 80 else \
+               0x37 if context.protocol_version >= 67 else \
+               0x09
+
+    packet_name = "held item change"
+
+    get_definition = staticmethod(lambda context: [
+        {'slot': UnsignedByte}
+    ])
+
+class SetSlotPacket(Packet):
+    @staticmethod
+    def get_id(context):
+        return 0x16 if context.protocol_later_eq(755) else \
+               0x15 if context.protocol_later_eq(741) else \
+               0x16 if context.protocol_later_eq(721) else \
+               0x17 if context.protocol_later_eq(550) else \
+               0x16 if context.protocol_later_eq(471) else \
+               0x17 if context.protocol_later_eq(345) else \
+               0x16 if context.protocol_later_eq(332) else \
+               0x17 if context.protocol_later_eq(318) else \
+               0x16 if context.protocol_later_eq(67) else \
+               0x2F
+
+    packet_name = 'set slot'
+    get_definition = staticmethod(lambda context: [
+        {'window_id': Byte},
+        {'slot': Short}
+    ])
+
+class SetExperiencePacket(Packet):
+    @staticmethod
+    def get_id(context):
+        return 0x51 if context.protocol_later_eq(755) else \
+               0x48 if context.protocol_later_eq(550) else \
+               0x47 if context.protocol_later_eq(471) else \
+               0x43 if context.protocol_later_eq(461) else \
+               0x44 if context.protocol_later_eq(451) else \
+               0x43 if context.protocol_later_eq(389) else \
+               0x42 if context.protocol_later_eq(352) else \
+               0x41 if context.protocol_later_eq(345) else \
+               0x40 if context.protocol_later_eq(336) else \
+               0x3F if context.protocol_later_eq(318) else \
+               0x3D if context.protocol_later_eq(86) else \
+               0x3E if context.protocol_later_eq(77) else \
+               0x3D if context.protocol_later_eq(67) else \
+               0x1F
+
+    packet_name = 'set experience'
+    get_definition = staticmethod(lambda context: [
+        {'experience_bar': Float},
+        {'level': VarInt},
+        {'total_experience': VarInt}
+    ])
+
+class EntityHeadLookPacket(Packet):
+    @staticmethod
+    def get_id(context):
+        return 0x3E if context.protocol_version >= 755 else \
+               0x3C if context.protocol_version >= 550 else \
+               0x3B if context.protocol_version >= 471 else \
+               0x39 if context.protocol_version >= 461 else \
+               0x3A if context.protocol_version >= 451 else \
+               0x39 if context.protocol_version >= 389 else \
+               0x38 if context.protocol_version >= 352 else \
+               0x37 if context.protocol_version >= 345 else \
+               0x36 if context.protocol_version >= 336 else \
+               0x35 if context.protocol_version >= 332 else \
+               0x36 if context.protocol_version >= 318 else \
+               0x34 if context.protocol_version >= 86 else \
+               0x35 if context.protocol_version >= 80 else \
+               0x34 if context.protocol_version >= 67 else \
+               0x19
+
+    packet_name = 'entity head look'
+
+    fields = 'entity_id', 'head_yaw'
+
+    definition = [
+        {'entity_id': VarInt},
+        {'head_yaw': Angle},
+    ]
 
 class KeepAlivePacket(AbstractKeepAlivePacket):
     @staticmethod
     def get_id(context):
-        return 0x1F if context.protocol_later_eq(741) else \
+        return 0x21 if context.protocol_later_eq(755) else \
+               0x1F if context.protocol_later_eq(741) else \
                0x20 if context.protocol_later_eq(721) else \
                0x21 if context.protocol_later_eq(550) else \
                0x20 if context.protocol_later_eq(471) else \
@@ -79,7 +210,8 @@ class KeepAlivePacket(AbstractKeepAlivePacket):
 class ServerDifficultyPacket(Packet):
     @staticmethod
     def get_id(context):
-        return 0x0D if context.protocol_later_eq(721) else \
+        return 0x0E if context.protocol_later_eq(755) else \
+               0x0D if context.protocol_later_eq(721) else \
                0x0E if context.protocol_later_eq(550) else \
                0x0D if context.protocol_later_eq(332) else \
                0x0E if context.protocol_later_eq(318) else \
@@ -99,7 +231,8 @@ class ServerDifficultyPacket(Packet):
 class ChatMessagePacket(Packet):
     @staticmethod
     def get_id(context):
-        return 0x0E if context.protocol_later_eq(721) else \
+        return 0x0F if context.protocol_later_eq(755) else \
+               0x0E if context.protocol_later_eq(721) else \
                0x0F if context.protocol_later_eq(550) else \
                0x0E if context.protocol_later_eq(343) else \
                0x0F if context.protocol_later_eq(332) else \
@@ -123,7 +256,8 @@ class ChatMessagePacket(Packet):
 class DisconnectPacket(Packet):
     @staticmethod
     def get_id(context):
-        return 0x19 if context.protocol_later_eq(741) else \
+        return 0x1A if context.protocol_later_eq(755) else \
+               0x19 if context.protocol_later_eq(741) else \
                0x1A if context.protocol_later_eq(721) else \
                0x1B if context.protocol_later_eq(550) else \
                0x1A if context.protocol_later_eq(471) else \
@@ -141,7 +275,10 @@ class DisconnectPacket(Packet):
 
 class SetCompressionPacket(Packet):
     # Note: removed between protocol versions 47 and 107.
-    id = 0x46
+    @staticmethod
+    def get_id(context):
+        return 0x02 if context.protocol_later_eq(755) else \
+               0x46
     packet_name = "set compression"
     definition = [
         {'threshold': VarInt}]
@@ -186,7 +323,8 @@ class SpawnPlayerPacket(Packet):
 class EntityVelocityPacket(Packet):
     @staticmethod
     def get_id(context):
-        return 0x46 if context.protocol_later_eq(721) else \
+        return 0x4F if context.protocol_later_eq(755) else \
+               0x46 if context.protocol_later_eq(721) else \
                0x47 if context.protocol_later_eq(707) else \
                0x46 if context.protocol_later_eq(550) else \
                0x45 if context.protocol_later_eq(471) else \
@@ -214,14 +352,15 @@ class EntityVelocityPacket(Packet):
 class EntityPositionDeltaPacket(Packet):
     @staticmethod
     def get_id(context):
-        return 0x27 if context.protocol_later_eq(741) else \
+        return 0x29 if context.protocol_later_eq(755) else \
+               0x27 if context.protocol_later_eq(741) else \
                0x28 if context.protocol_later_eq(721) else \
                0x29 if context.protocol_later_eq(550) else \
                0x28 if context.protocol_later_eq(389) else \
                0x27 if context.protocol_later_eq(345) else \
                0x26 if context.protocol_later_eq(318) else \
                0x25 if context.protocol_later_eq(94) else \
-               0x26 if context.protocol_later_eq(70) else \
+               0x26 if context.protocol_later_eq(67) else \
                0x15
 
     packet_name = "entity position delta"
@@ -253,7 +392,8 @@ class EntityPositionDeltaPacket(Packet):
 class TimeUpdatePacket(Packet):
     @staticmethod
     def get_id(context):
-        return 0x4E if context.protocol_later_eq(721) else \
+        return 0x58 if context.protocol_later_eq(755) else \
+               0x4E if context.protocol_later_eq(721) else \
                0x4F if context.protocol_later_eq(550) else \
                0x4E if context.protocol_later_eq(471) else \
                0x4A if context.protocol_later_eq(461) else \
@@ -264,7 +404,7 @@ class TimeUpdatePacket(Packet):
                0x47 if context.protocol_later_eq(336) else \
                0x46 if context.protocol_later_eq(318) else \
                0x44 if context.protocol_later_eq(94) else \
-               0x43 if context.protocol_later_eq(70) else \
+               0x43 if context.protocol_later_eq(67) else \
                0x03
 
     packet_name = "time update"
@@ -277,7 +417,8 @@ class TimeUpdatePacket(Packet):
 class UpdateHealthPacket(Packet):
     @staticmethod
     def get_id(context):
-        return 0x49 if context.protocol_later_eq(721) else \
+        return 0x52 if context.protocol_later_eq(755) else \
+               0x49 if context.protocol_later_eq(721) else \
                0x4A if context.protocol_later_eq(707) else \
                0x49 if context.protocol_later_eq(550) else \
                0x48 if context.protocol_later_eq(471) else \
@@ -304,21 +445,23 @@ class UpdateHealthPacket(Packet):
 class PluginMessagePacket(AbstractPluginMessagePacket):
     @staticmethod
     def get_id(context):
-        return 0x17 if context.protocol_later_eq(741) else \
+        return 0x18 if context.protocol_later_eq(755) else \
+               0x17 if context.protocol_later_eq(741) else \
                0x18 if context.protocol_later_eq(721) else \
                0x19 if context.protocol_later_eq(550) else \
                0x18 if context.protocol_later_eq(471) else \
                0x19 if context.protocol_later_eq(345) else \
                0x18 if context.protocol_later_eq(332) else \
                0x19 if context.protocol_later_eq(318) else \
-               0x18 if context.protocol_later_eq(70) else \
+               0x18 if context.protocol_later_eq(67) else \
                0x3F
 
 
 class PlayerListHeaderAndFooterPacket(Packet):
     @staticmethod
     def get_id(context):
-        return 0x53 if context.protocol_later_eq(721) else \
+        return 0x5E if context.protocol_later_eq(755) else \
+               0x53 if context.protocol_later_eq(721) else \
                0x54 if context.protocol_later_eq(550) else \
                0x53 if context.protocol_later_eq(471) else \
                0x5F if context.protocol_later_eq(461) else \
@@ -340,20 +483,46 @@ class PlayerListHeaderAndFooterPacket(Packet):
 class EntityLookPacket(Packet):
     @staticmethod
     def get_id(context):
-        return 0x29 if context.protocol_later_eq(741) else \
+        return 0x3E if context.protocol_later_eq(755) else \
+               0x29 if context.protocol_later_eq(741) else \
                0x2A if context.protocol_later_eq(721) else \
                0x2B if context.protocol_later_eq(550) else \
                0x2A if context.protocol_later_eq(389) else \
                0x29 if context.protocol_later_eq(345) else \
                0x28 if context.protocol_later_eq(318) else \
                0x27 if context.protocol_later_eq(94) else \
-               0x28 if context.protocol_later_eq(70) else \
+               0x28 if context.protocol_later_eq(67) else \
                0x16
 
     packet_name = 'entity look'
     definition = [
         {'entity_id': VarInt},
-        {'yaw': Angle},
-        {'pitch': Angle},
-        {'on_ground': Boolean}
+        {'yaw': Angle}
+    ]
+
+class ResourcePackSendPacket(Packet):
+    @staticmethod
+    def get_id(context):
+        return 0x3C if context.protocol_later_eq(755) else \
+               0x38 if context.protocol_later_eq(741) else \
+               0x39 if context.protocol_later_eq(721) else \
+               0x3A if context.protocol_later_eq(550) else \
+               0x39 if context.protocol_later_eq(471) else \
+               0x37 if context.protocol_later_eq(461) else \
+               0x38 if context.protocol_later_eq(451) else \
+               0x37 if context.protocol_later_eq(389) else \
+               0x36 if context.protocol_later_eq(352) else \
+               0x35 if context.protocol_later_eq(345) else \
+               0x34 if context.protocol_later_eq(336) else \
+               0x33 if context.protocol_later_eq(332) else \
+               0x34 if context.protocol_later_eq(318) else \
+               0x32 if context.protocol_later_eq(86) else \
+               0x33 if context.protocol_later_eq(80) else \
+               0x32 if context.protocol_later_eq(67) else \
+               0x48 
+
+    packet_name = "resource pack send"
+    definition = [
+        {"url": String},
+        {"hash": String}
     ]

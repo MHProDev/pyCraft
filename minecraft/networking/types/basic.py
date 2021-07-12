@@ -152,17 +152,15 @@ class VarInt(Type):
         bytes_encountered = 0
         while True:
             byte = file_object.read(1)
-            if len(byte) < 1:
-                raise EOFError("Unexpected end of message.")
+            if len(byte) > 0:
+                byte = ord(byte)
+                number |= (byte & 0x7F) << 7 * bytes_encountered
+                if not byte & 0x80:
+                    break
 
-            byte = ord(byte)
-            number |= (byte & 0x7F) << 7 * bytes_encountered
-            if not byte & 0x80:
-                break
-
-            bytes_encountered += 1
-            if bytes_encountered > cls.max_bytes:
-                raise ValueError("Tried to read too long of a VarInt")
+                bytes_encountered += 1
+                if bytes_encountered > cls.max_bytes:
+                    raise ValueError("Tried to read too long of a VarInt")
         return number
 
     @staticmethod

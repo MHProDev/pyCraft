@@ -55,7 +55,7 @@ class LoginSuccessPacket(Packet):
 
     packet_name = "login success"
     get_definition = staticmethod(lambda context: [
-        {'UUID': UUID if context.protocol_later_eq(707) else String},
+        {'UUID': UUID if context.protocol_later_eq(67) else String},
         {'Username': String}
     ])
 

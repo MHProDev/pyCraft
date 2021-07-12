@@ -100,3 +100,21 @@ class PositionAndLook(MutableRecord):
     position = multi_attribute_alias(Vector, 'x', 'y', 'z')
 
     look = multi_attribute_alias(Direction, 'yaw', 'pitch')
+
+LookAndDirection = namedtuple('LookAndDirection',
+                              ('yaw', 'pitch', 'head_pitch'))
+
+class PositionLookAndDirection(MutableRecord):
+    """
+    A mutable record containing 3 spatial position coordinates,
+    2 rotational components and an additional rotational component for
+    the head of the object.
+    """
+    __slots__ = 'x', 'y', 'z', 'yaw', 'pitch', 'head_pitch'
+
+    position = multi_attribute_alias(Vector, 'x', 'y', 'z')
+
+    look = multi_attribute_alias(Direction, 'yaw', 'pitch')
+
+    look_and_direction = multi_attribute_alias(LookAndDirection,
+                                               'yaw', 'pitch', 'head_pitch')

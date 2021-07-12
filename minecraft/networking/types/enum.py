@@ -12,7 +12,7 @@ from .utility import Vector
 
 __all__ = (
     'Enum', 'BitFieldEnum', 'AbsoluteHand', 'RelativeHand', 'BlockFace',
-    'Difficulty', 'Dimension', 'GameMode', 'OriginPoint'
+    'Difficulty', 'Dimension', 'GameMode', 'OriginPoint', 'ClickType'
 )
 
 
@@ -55,6 +55,10 @@ class RelativeHand(Enum):
     MAIN = 0
     OFF = 1
 
+class ClickType(Enum):
+    INTERACT = 0
+    ATTACK = 1
+    INTERACT_AT = 2
 
 # Designation of one of a block's 6 faces.
 class BlockFace(Enum):
